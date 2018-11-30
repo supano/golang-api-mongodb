@@ -119,7 +119,7 @@ func (h *handler) view(c echo.Context) error {
 	id := bson.ObjectIdHex(c.Param("id"))
 	var u user
 	if err := collection.FindId(id).One(&u); err != nil {
-		return err
+		return c.JSON(http.StatusNotFound, message{Message: "user not found with id : " + c.Param("id")})
 	}
 
 	return c.JSON(http.StatusOK, u)
