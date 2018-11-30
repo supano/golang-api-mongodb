@@ -30,12 +30,19 @@ func main() {
 	e.PUT("/api/users/:id", h.update)
 	e.PATCH("/api/users/:id", h.update)
 	e.DELETE("/api/users/:id", h.delete)
+
+	e.POST("/api/login", h.login)
 	e.Logger.Fatal(e.Start(":1323"))
 }
 
 type (
 	handler struct {
 		m *mgo.Session
+	}
+
+	login struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	user struct {
@@ -78,21 +85,10 @@ func (h *handler) create(c echo.Context) error {
 }
 
 func (h *handler) isDuplicated(email string) bool {
-	session := h.m.Copy()
-	defer session.Close()
-
-	collection := session.Copy().DB("golang").C("users")
-	u := new(user)
-
-	if err := collection.Find(bson.M{"email": email}).One(u); err != nil {
-		return false
+	if user := h.findByEmail(email); user.Email == "" {
+		return true
 	}
-
-	if u == nil {
-		return false
-	}
-
-	return true
+	return false
 }
 
 func (h *handler) list(c echo.Context) error {
@@ -163,4 +159,34 @@ func (h *handler) delete(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, true)
+}
+
+func (h *handler) login(c echo.Context) error {
+	loginObj := new(login)
+	c.Bind(loginObj)
+
+	user := new(user)
+	if user = h.findByEmail(loginObj.Email); user.Email == "" {
+		return c.JSON(http.StatusUnauthorized, message{Message: "user not found with email : " + loginObj.Email})
+	}
+
+	if loginObj.Password != user.Password {
+		return c.JSON(http.StatusUnauthorized, message{Message: "password not correct"})
+	}
+
+	return c.JSON(http.StatusOK, message{Message: "welcome " + user.Fname})
+}
+
+func (h *handler) findByEmail(email string) *user {
+	session := h.m.Copy()
+	defer session.Close()
+
+	collection := session.Copy().DB("golang").C("users")
+	u := new(user)
+
+	if err := collection.Find(bson.M{"email": email}).One(u); err != nil {
+		return u
+	}
+
+	return u
 }
