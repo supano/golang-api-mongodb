@@ -33,17 +33,23 @@ func main() {
 	e.Logger.Fatal(e.Start(":1323"))
 }
 
-type handler struct {
-	m *mgo.Session
-}
+type (
+	handler struct {
+		m *mgo.Session
+	}
 
-type user struct {
-	ID       bson.ObjectId `json:"id" bson:"_id"`
-	Email    string        `json:"email" bson:"email"`
-	Password string        `json:"password" bson:"password"`
-	Fname    string        `json:"fname" bson:"fname"`
-	Lname    string        `json:"lname" bson:"lname"`
-}
+	user struct {
+		ID       bson.ObjectId `json:"id" bson:"_id"`
+		Email    string        `json:"email" bson:"email"`
+		Password string        `json:"password" bson:"password"`
+		Fname    string        `json:"fname" bson:"fname"`
+		Lname    string        `json:"lname" bson:"lname"`
+	}
+
+	message struct {
+		Message string `json:"message"`
+	}
+)
 
 func (h *handler) create(c echo.Context) error {
 	session := h.m.Copy()
@@ -69,7 +75,11 @@ func (h *handler) list(c echo.Context) error {
 	collection := session.Copy().DB("golang").C("users")
 	var userlist []user
 	if err := collection.Find(nil).All(&userlist); err != nil {
-		return err
+		return c.JSON(http.StatusNotFound, message{Message: "error when find users"})
+	}
+
+	if userlist == nil {
+		return c.JSON(http.StatusNotFound, message{Message: "found 0 user in database"})
 	}
 
 	return c.JSON(http.StatusOK, userlist)
