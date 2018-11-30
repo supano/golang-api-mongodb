@@ -49,11 +49,16 @@ type (
 	message struct {
 		Message string `json:"message"`
 	}
+
+	queryEmail struct {
+		Email string `json:"email"`
+	}
 )
 
 func (h *handler) create(c echo.Context) error {
 	session := h.m.Copy()
 	defer session.Close()
+	collection := session.Copy().DB("golang").C("users")
 
 	u := new(user)
 	if err := c.Bind(u); err != nil {
@@ -61,11 +66,33 @@ func (h *handler) create(c echo.Context) error {
 	}
 	u.ID = bson.NewObjectId()
 
-	collection := session.Copy().DB("golang").C("users")
-	if err := collection.Insert(u); err != nil {
-		return err
+	if h.isDuplicated(u.Email) {
+		return c.JSON(http.StatusConflict, message{Message: "email is already in used"})
 	}
-	return c.JSON(http.StatusOK, u)
+
+	if err := collection.Insert(u); err != nil {
+		return c.JSON(http.StatusConflict, message{Message: "error when try to create new user"})
+	}
+
+	return c.JSON(http.StatusCreated, u)
+}
+
+func (h *handler) isDuplicated(email string) bool {
+	session := h.m.Copy()
+	defer session.Close()
+
+	collection := session.Copy().DB("golang").C("users")
+	u := new(user)
+
+	if err := collection.Find(bson.M{"email": email}).One(u); err != nil {
+		return false
+	}
+
+	if u == nil {
+		return false
+	}
+
+	return true
 }
 
 func (h *handler) list(c echo.Context) error {
